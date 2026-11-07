@@ -63,10 +63,15 @@ class OrderService:
             order ["order_id"] = "ORD-" + str(state["next_order_number"]).zfill(4)
             order ["status"] = "placed"
 
+            products = {
+                product["product_id"]: product
+                for product in state["catalog"]
+            }
+
             for line in lines:
-              for product in state["catalog"]:
-                  if product["product_id"] == line["product_id"]:
-                     product["stock"] -= line["quantity"]
+                product = products[line["product_id"]]
+                product["stock"] -= line["quantity"]
+                
             state["next_order_number"] += 1
             state["orders"].append(order)
             self.store.save(state)
