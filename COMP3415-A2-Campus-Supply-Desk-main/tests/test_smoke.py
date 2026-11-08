@@ -81,5 +81,43 @@ class OrderSmokeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.service.cancel_order(order["order_id"])
 
+    def test_express_delivery(self):
+        quote = self.service.quote("regular", [{"product_id": "notebook", "quantity": 2}], "express")
+        self.assertEqual(quote["subtotal_cents"], 1000)
+        self.assertEqual(quote["delivery_cents"], 1200)
+        self.assertEqual(quote["total_cents"], 2200)
+
+    def test_express_above_100(self):
+        quote = self.service.quote("regular", [{"product_id": "notebook", "quantity": 20}], "express")
+        self.assertEqual(quote["subtotal_cents"], 10000)
+        self.assertEqual(quote["delivery_cents"], 1200)
+        self.assertEqual(quote["total_cents"], 11200)
+
+    def test_discount_with_express(self):
+        quote = self.service.quote("student", [{"product_id": "hoodie", "quantity": 2}], "express")
+        self.assertEqual(quote["subtotal_cents"], 8000)
+        self.assertEqual(quote["discount_cents"], 800)
+        self.assertEqual(quote["delivery_cents"], 1200)
+        self.assertEqual(quote["total_cents"], 8400)
+
+    def test_express_quote_matches_order(self):
+        items = [{"product_id": "notebook", "quantity": 2}]
+        quote = self.service.quote("regular", items, "express") 
+        order = self.service.place_order("regular", items, "express") 
+        self.assertEqual(order["fulfillment"], "express")
+        self.assertEqual(order["subtotal_cents"], quote["subtotal_cents"])
+        self.assertEqual(order["discount_cents"], quote["discount_cents"])
+        self.assertEqual(order["delivery_cents"], quote["delivery_cents"])
+        self.assertEqual(order["total_cents"], quote["total_cents"])
+
+    def test_express_orders_can_be_reopened(self):
+        order = self.service.place_order("regular", [{"product_id": "notebook", "quantity": 2}], "express")
+        reopened_service = OrderService(self.path)
+        reopened_order = reopened_service.get_order(order["order_id"])
+        self.assertEqual(reopened_order["fulfillment"], "express")
+        self.assertEqual(reopened_order["delivery_cents"], 1200)
+        self.assertEqual(reopened_order["total_cents"], 2200)
+
+
 if __name__ == "__main__":
     unittest.main()
