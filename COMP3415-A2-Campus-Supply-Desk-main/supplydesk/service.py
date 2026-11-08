@@ -10,12 +10,34 @@ class OrderService:
     def catalog(self):
         return self.store.load()["catalog"]
 
+    def pickup_fee(self, subtotal):
+        return 0
+
+    def standard_delivery(self, subtotal):
+        if subtotal < 10000:
+            return 600
+        return 0
+
+    def express_delivery(self, subtotal):
+        return 1200
+
+    def calculate_delivery_fee(self, fulfillment, subtotal):
+        fee_calculator = {
+            "pickup": self.pickup_fee,
+            "delivery": self.standard_delivery,
+            "express": self.express_delivery
+        }
+        if fulfillment not in fee_calculator:
+            raise ValueError("Invalid fulfillment type.")
+
+        return fee_calculator[fulfillment](subtotal)
+
     def place_quote_order(self, customer_type, items, fulfillment, place = False):
         state = self.store.load()
         if customer_type not in ("regular", "student"):
             raise ValueError("Customer type must be regular or student.")
-        if fulfillment not in ("pickup", "delivery"):
-            raise ValueError("Fulfillment must be pickup or delivery.")
+        if fulfillment not in ("pickup", "delivery", "express"):
+            raise ValueError("Fulfillment must be pickup, delivery or express.")
         if not isinstance(items, list) or not items:
             raise ValueError("An order must contain at least one item.")
         lines = []
@@ -47,9 +69,7 @@ class OrderService:
         discount = 0
         if customer_type == "student" and subtotal > 5000:
             discount = (subtotal * 10 + 50) // 100
-        delivery = 0
-        if fulfillment == "delivery" and subtotal - discount < 10000:
-            delivery = 600
+        delivery = self.calculate_delivery_fee(fulfillment, subtotal - discount)
         order = {
             "customer_type": customer_type,
             "fulfillment": fulfillment,
@@ -71,7 +91,7 @@ class OrderService:
             for line in lines:
                 product = products[line["product_id"]]
                 product["stock"] -= line["quantity"]
-                
+
             state["next_order_number"] += 1
             state["orders"].append(order)
             self.store.save(state)
